@@ -8,6 +8,7 @@
 struct datarec {
 	__u64 rx_packets;
 	/* Assignment#1: Add byte counters */
+	__u64 bytes_count;
 };
 
 #ifndef XDP_ACTION_MAX

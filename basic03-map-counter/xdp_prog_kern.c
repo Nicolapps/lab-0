@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/bpf.h>
 #include <bpf/bpf_helpers.h>
+#include <stdint.h>
 
 #include "common_kern_user.h" /* defines: struct datarec; */
 
@@ -43,6 +44,7 @@ int  xdp_stats1_func(struct xdp_md *ctx)
 	 * use an atomic operation.
 	 */
 	lock_xadd(&rec->rx_packets, 1);
+	lock_xadd(&rec->bytes_count, (uintptr_t)ctx->data_end - (uintptr_t)ctx->data);
         /* Assignment#1: Add byte counters
          * - Hint look at struct xdp_md *ctx (copied below)
          *
