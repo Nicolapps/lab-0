@@ -121,11 +121,11 @@ static void stats_print(struct stats_record *stats_rec,
 	double pps; /* packets per sec */
 
 	/* Assignment#2: Print other XDP actions stats  */
-	{
+	for (int i = 0; i < XDP_ACTION_MAX; i++) {
 		char *fmt = "%-12s %'11lld pkts (%'10.0f pps, %d bytes)"
 			//" %'11lld Kbytes (%'6.0f Mbits/s)"
 			" period:%f\n";
-		const char *action = action2str(XDP_PASS);
+		const char *action = action2str(i);
 		rec  = &stats_rec->stats[0];
 		prev = &stats_prev->stats[0];
 
