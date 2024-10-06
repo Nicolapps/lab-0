@@ -3,6 +3,8 @@
 #include <linux/in.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 
 // The parsing helper functions from the packet01 lesson have moved here
 #include "../common/parsing_helpers.h"
@@ -57,6 +59,39 @@ static __always_inline int vlan_tag_push(struct xdp_md *ctx,
 SEC("xdp")
 int xdp_port_rewrite_func(struct xdp_md *ctx)
 {
+	void *data_end = (void *)(long)ctx->data_end;
+	void *data = (void *)(long)ctx->data;
+	struct ethhdr *eth;
+	struct ipv6hdr *ip6h;
+
+	/* These keep track of the next header type and iterator pointer */
+	struct hdr_cursor nh;
+	int nh_type;
+	nh.pos = data;
+
+	nh_type = parse_ethhdr(&nh, data_end, &eth);
+	if (nh_type != bpf_htons(ETH_P_IPV6)) {
+		return XDP_PASS;
+	}
+
+	int ipv6_type = parse_ip6hdr(&nh, data_end, &ip6h);
+	if (ipv6_type != bpf_htons(IPPROTO_ICMPV6)) {
+		return XDP_PASS;
+	}
+
+	if (ipv6_type == IPPROTO_TCP) {
+		struct tcphdr *tcp = nh.pos;
+		if (tcp + 1 > data_end)
+			return XDP_ABORTED;
+		tcp->dest = bpf_htons(bpf_ntohs(tcp->dest) - 1);
+	} else if (ipv6_type == IPPROTO_UDP) {
+		struct udphdr *udp = nh.pos;
+		if (udp + 1 > data_end)
+			return XDP_ABORTED;
+		udp->dest = bpf_htons(bpf_ntohs(udp->dest) - 1);
+	}
+	// else pass
+
 	return XDP_PASS;
 }
 
