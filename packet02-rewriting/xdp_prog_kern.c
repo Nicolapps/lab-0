@@ -5,6 +5,7 @@
 #include <bpf/bpf_endian.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
+#include <string.h>
 
 // The parsing helper functions from the packet01 lesson have moved here
 #include "../common/parsing_helpers.h"
@@ -23,27 +24,41 @@ static __always_inline int vlan_tag_pop(struct xdp_md *ctx, struct ethhdr *eth)
 	struct ethhdr eth_cpy;
 	struct vlan_hdr *vlh;
 	__be16 h_proto;
-	*/
 	int vlid = -1;
+	*/
 
 	/* Check if there is a vlan tag to pop */
+	__be16 ethernet_contents_type = eth->h_proto;
+	if (!proto_is_vlan(ethernet_contents_type)) return -1;
 
 	/* Still need to do bounds checking */
+	void *data_end = (void *)(long)ctx->data_end;
+	struct vlan_hdr *vlan = (void *)((void *)eth + sizeof(*eth));
+	if (vlan + 1 > data_end) return -1;
 
 	/* Save vlan ID for returning, h_proto for updating Ethernet header */
+	struct vlan_hdr vlan_copy = *vlan;
 
 	/* Make a copy of the outer Ethernet header before we cut it off */
+	struct ethhdr ethernet_header_copy;
+	memcpy(&ethernet_header_copy, eth, sizeof(*eth));
 
 	/* Actually adjust the head pointer */
+	int ret_adjust = bpf_xdp_adjust_head(ctx, sizeof(struct vlan_hdr));
+	if (ret_adjust != 0) return -1;
 
 	/* Need to re-evaluate data *and* data_end and do new bounds checking
 	 * after adjusting head
 	 */
+	struct ethhdr *new_eth = (void *)(long)ctx->data;
+	void *new_data_end = (void *)(long)ctx->data_end;
+	if (new_eth + 1 > new_data_end) return -1;
 
 	/* Copy back the old Ethernet header and update the proto type */
+	memcpy(eth, &ethernet_header_copy, sizeof(ethernet_header_copy));
+	eth->h_proto = vlan_copy.h_vlan_encapsulated_proto;
 
-
-	return vlid;
+	return bpf_ntohs(vlan_copy.h_vlan_TCI);
 }
 
 /* Pushes a new VLAN tag after the Ethernet header. Returns 0 on success,
